@@ -1,29 +1,46 @@
-// Optimized script for faster camera and object detection
+// Enhanced script.js for Vercel deployment
+// Optimized for faster camera and object detection in production
+
+console.log("🚀 Script.js loaded - Enhanced for Vercel deployment");
 
 // Global variables
 let isDetecting = false;
 let detectionInterval = null;
-const DETECTION_DELAY = 2000; // 2 seconds between detections
+const DETECTION_DELAY = 3000; // 3 seconds between detections for better performance
 
+// Production-ready configuration
 const ROBOFLOW_CONFIG = {
-  API_KEY: "UL8nLpCiEBGbxYqRq0nY", // Updated to the working API key
+  API_KEY: "UL8nLpCiEBGbxYqRq0nY",
   PROJECT: "dataset-6nff1",
   VERSION: 4,
-  CONFIDENCE: 40, // Increased confidence threshold
+  CONFIDENCE: 40,
   OVERLAP: 30,
 };
 
+// Environment detection
+const isProduction =
+  window.location.hostname.includes("vercel.app") ||
+  window.location.protocol === "https:";
+const isDevelopment =
+  window.location.hostname === "localhost" ||
+  window.location.hostname === "127.0.0.1";
+
 // Debug configuration
-console.log("🔧 Using API Config:", {
+console.log("🔧 Enhanced API Config:", {
   project: ROBOFLOW_CONFIG.PROJECT,
   version: ROBOFLOW_CONFIG.VERSION,
   confidence: ROBOFLOW_CONFIG.CONFIDENCE,
+  environment: isProduction ? "Production (Vercel)" : "Development",
+  protocol: window.location.protocol,
+  hostname: window.location.hostname,
 });
 
 // Wait for DOM to be ready
 document.addEventListener("DOMContentLoaded", function () {
-  console.log("Script.js loaded");
-  setupImageUpload();
+  console.log("✅ Enhanced script.js initialized");
+
+  // Note: Image upload is now handled by camera.js
+  console.log("📝 Image upload functionality delegated to camera.js");
 });
 
 // Start object detection (called from index.html)
@@ -83,7 +100,7 @@ function setupCanvasOverlay() {
   }
 }
 
-// Main detection function
+// Main detection function - Enhanced for production
 async function detectObjects() {
   if (isDetecting) {
     console.log("⏳ Detection already in progress, skipping...");
@@ -110,78 +127,146 @@ async function detectObjects() {
       setupCanvasOverlay();
     }
 
-    // Capture frame
+    // Capture frame with better quality
     const frameCanvas = document.createElement("canvas");
     frameCanvas.width = video.videoWidth;
     frameCanvas.height = video.videoHeight;
     const frameCtx = frameCanvas.getContext("2d");
+
+    // Ensure clean frame capture
+    frameCtx.clearRect(0, 0, frameCanvas.width, frameCanvas.height);
     frameCtx.drawImage(video, 0, 0);
 
-    console.log("📸 Frame captured, sending to API...");
+    console.log(
+      "📸 Frame captured:",
+      frameCanvas.width + "x" + frameCanvas.height
+    );
 
-    // Convert to blob and send to API
+    // Convert to blob with optimization for API
     frameCanvas.toBlob(
       async (blob) => {
         try {
-          console.log("📤 Sending blob to Roboflow API...");
+          if (!blob) {
+            throw new Error("Failed to create image blob from camera frame");
+          }
+
+          console.log("📤 Sending camera frame to API...");
+          console.log("📦 Frame blob size:", blob.size, "bytes");
+
           const predictions = await sendToRoboflow(blob);
           console.log("📥 Received predictions:", predictions.length);
+
           drawPredictions(predictions);
+
+          // Update camera status
+          if (window.updateCameraStatus) {
+            window.updateCameraStatus(
+              "active",
+              `<i class="fas fa-video"></i> Live detection active (${predictions.length} fish)`
+            );
+          }
         } catch (error) {
           console.error("🚨 Detection error:", error);
+
+          // Update camera status with error
+          if (window.updateCameraStatus) {
+            window.updateCameraStatus(
+              "error",
+              `<i class="fas fa-exclamation-triangle"></i> Detection error`
+            );
+          }
         } finally {
           isDetecting = false;
         }
       },
       "image/jpeg",
-      0.8 // Higher quality for better detection
-    );
+      0.85
+    ); // Optimized quality for better API performance
   } catch (error) {
     console.error("🚨 Frame capture error:", error);
     isDetecting = false;
   }
 }
 
-// Send image to Roboflow API with improved error handling
+// Send image to Roboflow API with improved error handling for production
 async function sendToRoboflow(imageBlob) {
   const formData = new FormData();
   formData.append("file", imageBlob, "frame.jpg");
 
-  const url = `https://detect.roboflow.com/${ROBOFLOW_CONFIG.PROJECT}/${ROBOFLOW_CONFIG.VERSION}?api_key=${ROBOFLOW_CONFIG.API_KEY}&confidence=${ROBOFLOW_CONFIG.CONFIDENCE}&overlap=${ROBOFLOW_CONFIG.OVERLAP}&format=json`;
+  // Use HTTPS endpoint for production
+  const baseUrl = "https://detect.roboflow.com";
+  const url = `${baseUrl}/${ROBOFLOW_CONFIG.PROJECT}/${ROBOFLOW_CONFIG.VERSION}?api_key=${ROBOFLOW_CONFIG.API_KEY}&confidence=${ROBOFLOW_CONFIG.CONFIDENCE}&overlap=${ROBOFLOW_CONFIG.OVERLAP}&format=json`;
 
   console.log("🌐 API URL:", url.replace(ROBOFLOW_CONFIG.API_KEY, "***"));
+  console.log("📦 Blob size:", imageBlob.size, "bytes");
+  console.log("📦 Blob type:", imageBlob.type);
 
   try {
     const response = await fetch(url, {
       method: "POST",
       body: formData,
+      mode: "cors", // Explicitly set CORS mode
+      headers: {
+        // Let browser set Content-Type with boundary for FormData
+      },
     });
 
     console.log("📡 Response status:", response.status);
+    console.log(
+      "📡 Response headers:",
+      Object.fromEntries(response.headers.entries())
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error("🚨 API Error Response:", errorText);
-      throw new Error(
-        `HTTP ${response.status}: ${response.statusText} - ${errorText}`
-      );
+
+      // More detailed error for debugging
+      if (response.status === 401) {
+        throw new Error("API Key authentication failed");
+      } else if (response.status === 403) {
+        throw new Error("API access forbidden - check project permissions");
+      } else if (response.status === 429) {
+        throw new Error("Rate limit exceeded - please wait");
+      } else if (response.status === 413) {
+        throw new Error("Payload too large - frame size issue");
+      } else {
+        throw new Error(
+          `HTTP ${response.status}: ${response.statusText} - ${errorText}`
+        );
+      }
     }
 
     const result = await response.json();
     console.log("✅ API Success:", result);
 
+    // Validate response structure
+    if (!result || typeof result !== "object") {
+      throw new Error("Invalid API response format");
+    }
+
     return result.predictions || [];
   } catch (error) {
     console.error("🚨 Fetch error:", error);
+
+    // Show user-friendly error message
+    if (
+      error.name === "TypeError" &&
+      error.message.includes("Failed to fetch")
+    ) {
+      console.error("Network error - check internet connection");
+      throw new Error("Network error - please check your internet connection");
+    }
+
     throw error;
   }
 }
 
-// Draw predictions on canvas with improved visibility
+// Enhanced prediction drawing with better visibility
 function drawPredictions(predictions) {
   const canvas = document.getElementById("overlayCanvas");
   if (!canvas) {
-    console.error("Canvas not found for drawing");
+    console.warn("Overlay canvas not found");
     return;
   }
 
@@ -189,50 +274,94 @@ function drawPredictions(predictions) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   if (!predictions || predictions.length === 0) {
-    console.log("📊 No predictions to draw");
+    console.log("� No fish detected in current frame");
     return;
   }
 
   console.log(`🎨 Drawing ${predictions.length} predictions`);
 
-  // Set drawing style with better visibility
-  ctx.strokeStyle = "#00ff00";
-  ctx.lineWidth = 4;
-  ctx.font = "bold 18px Arial";
-  ctx.fillStyle = "#00ff00";
-  ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
-  ctx.shadowBlur = 3;
+  const colors = [
+    "#ff6b6b",
+    "#4ecdc4",
+    "#45b7d1",
+    "#f9ca24",
+    "#f0932b",
+    "#eb4d4b",
+    "#6c5ce7",
+    "#a29bfe",
+    "#fd79a8",
+    "#e17055",
+  ];
 
   predictions.forEach((prediction, index) => {
-    console.log(`🔹 Drawing prediction ${index + 1}:`, prediction);
-
-    const { x, y, width, height, class: className, confidence } = prediction;
+    const { x, y, width, height, confidence, class: className } = prediction;
 
     // Calculate box coordinates (Roboflow uses center coordinates)
     const boxX = x - width / 2;
     const boxY = y - height / 2;
 
-    // Draw bounding box
+    const color = colors[index % colors.length];
+
+    // Draw bounding box with enhanced styling
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 4;
+    ctx.setLineDash([]);
     ctx.strokeRect(boxX, boxY, width, height);
 
-    // Draw label with background
-    const label = `${className} ${Math.round(confidence * 100)}%`;
+    // Draw filled background for label
+    const label = `${className} (${Math.round(confidence * 100)}%)`;
+    ctx.font = "bold 16px Inter, Arial, sans-serif";
     const textMetrics = ctx.measureText(label);
     const textWidth = textMetrics.width;
-    const labelY = boxY > 25 ? boxY - 10 : boxY + height + 25;
+    const textHeight = 20;
 
-    // Draw label background
-    ctx.fillStyle = "rgba(0, 255, 0, 0.9)";
-    ctx.shadowBlur = 0;
-    ctx.fillRect(boxX - 2, labelY - 20, textWidth + 12, 24);
+    // Background rectangle
+    ctx.fillStyle = color;
+    ctx.fillRect(boxX, boxY - textHeight - 8, textWidth + 16, textHeight + 8);
 
-    // Draw label text
-    ctx.fillStyle = "black";
-    ctx.fillText(label, boxX + 4, labelY - 2);
+    // Text
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(label, boxX + 8, boxY - 8);
 
-    // Reset for next prediction
-    ctx.fillStyle = "#00ff00";
-    ctx.shadowBlur = 3;
+    // Add corner indicators for better visibility
+    const cornerSize = 12;
+    ctx.lineWidth = 3;
+
+    // Top-left corner
+    ctx.beginPath();
+    ctx.moveTo(boxX, boxY + cornerSize);
+    ctx.lineTo(boxX, boxY);
+    ctx.lineTo(boxX + cornerSize, boxY);
+    ctx.stroke();
+
+    // Top-right corner
+    ctx.beginPath();
+    ctx.moveTo(boxX + width - cornerSize, boxY);
+    ctx.lineTo(boxX + width, boxY);
+    ctx.lineTo(boxX + width, boxY + cornerSize);
+    ctx.stroke();
+
+    // Bottom-left corner
+    ctx.beginPath();
+    ctx.moveTo(boxX, boxY + height - cornerSize);
+    ctx.lineTo(boxX, boxY + height);
+    ctx.lineTo(boxX + cornerSize, boxY + height);
+    ctx.stroke();
+
+    // Bottom-right corner
+    ctx.beginPath();
+    ctx.moveTo(boxX + width - cornerSize, boxY + height);
+    ctx.lineTo(boxX + width, boxY + height);
+    ctx.lineTo(boxX + width, boxY + height - cornerSize);
+    ctx.stroke();
+
+    console.log(
+      `🐟 Detected: ${className} (${Math.round(
+        confidence * 100
+      )}%) at [${Math.round(boxX)}, ${Math.round(boxY)}, ${Math.round(
+        width
+      )}, ${Math.round(height)}]`
+    );
   });
 
   console.log(`✅ Successfully drew ${predictions.length} predictions`);

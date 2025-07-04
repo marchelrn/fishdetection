@@ -1133,5 +1133,76 @@
     <!-- Load external scripts -->
     <script src="camera.js"></script>
     <script src="script.js"></script>
+
+    <!-- Production debugging and error handling -->
+    <script>
+      // Enhanced production debugging
+      if (
+        window.location.hostname.includes("vercel.app") ||
+        window.location.protocol === "https:"
+      ) {
+        console.log("🚀 Production mode detected on Vercel");
+
+        // Enhanced error logging for production
+        window.addEventListener("error", function (e) {
+          console.error("🚨 Global error:", e.error);
+          console.error("📍 Stack:", e.error?.stack);
+          console.error("📄 File:", e.filename, "Line:", e.lineno);
+        });
+
+        window.addEventListener("unhandledrejection", function (e) {
+          console.error("🚨 Unhandled promise rejection:", e.reason);
+          e.preventDefault(); // Prevent default browser error handling
+        });
+
+        // Enhanced fetch debugging
+        const originalFetch = window.fetch;
+        window.fetch = function (...args) {
+          console.log("🌐 Fetch request:", args[0]);
+          const requestTime = Date.now();
+
+          return originalFetch
+            .apply(this, args)
+            .then((response) => {
+              const responseTime = Date.now() - requestTime;
+              console.log(
+                `📡 Fetch response: ${response.status} ${response.statusText} (${responseTime}ms)`
+              );
+              return response;
+            })
+            .catch((error) => {
+              const responseTime = Date.now() - requestTime;
+              console.error(`🚨 Fetch failed after ${responseTime}ms:`, error);
+              throw error;
+            });
+        };
+
+        // Check for required APIs
+        console.log("🔍 Checking browser capabilities:");
+        console.log("- getUserMedia:", !!navigator.mediaDevices?.getUserMedia);
+        console.log("- fetch:", !!window.fetch);
+        console.log("- FormData:", !!window.FormData);
+        console.log("- Canvas:", !!document.createElement("canvas").getContext);
+        console.log("- WebRTC:", !!window.RTCPeerConnection);
+
+        // Environment info
+        console.log("🌍 Environment info:");
+        console.log("- User Agent:", navigator.userAgent);
+        console.log("- Platform:", navigator.platform);
+        console.log("- Languages:", navigator.languages);
+        console.log("- Online:", navigator.onLine);
+
+        // Performance monitoring
+        if (performance.mark) {
+          performance.mark("app-start");
+          window.addEventListener("load", () => {
+            performance.mark("app-loaded");
+            performance.measure("app-load-time", "app-start", "app-loaded");
+            const measure = performance.getEntriesByName("app-load-time")[0];
+            console.log(`⚡ App load time: ${measure.duration.toFixed(2)}ms`);
+          });
+        }
+      }
+    </script>
   </body>
 </html>

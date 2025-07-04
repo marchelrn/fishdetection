@@ -1,14 +1,40 @@
 {
-  "builds": [
+  "buildCommand": null,
+  "devCommand": null,
+  "installCommand": null,
+  "outputDirectory": ".",
+  "public": true,
+  "headers": [
     {
-      "src": "index.html",
-      "use": "@vercel/static"
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=*, microphone=*, geolocation=*"
+        }
+      ]
     }
   ],
-  "routes": [
+  "rewrites": [
     {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
